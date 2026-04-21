@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSFW Shield | Content Moderation AI</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --bg: #f8fafc;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-image: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%), 
+                              radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.1) 0px, transparent 50%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 550px;
+            width: 100%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        header {
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        /* Zone d'upload */
+        .upload-area {
+            border: 2px dashed #e2e8f0;
+            border-radius: 20px;
+            padding: 40px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #fdfdfd;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: #f5f7ff;
+        }
+
+        .upload-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        #fileInput { display: none; }
+
+        /* Preview */
+        .preview-container {
+            margin-top: 24px;
+            position: relative;
+            display: none;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .preview-image {
+            width: 100%;
+            display: block;
+            transition: filter 0.5s ease;
+        }
+
+        /* État du résultat */
+        .status-badge {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: none;
+            animation: slideUp 0.3s ease;
+        }
+
+        .status-allowed { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .status-blocked { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+        /* Loader */
+        .loader {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e2e8f0;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        footer {
+            margin-top: 32px;
+            font-size: 12px;
+            color: #94a3b8;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <header>
+        <h1>🛡️ NSFW Shield AI</h1>
+        <p class="subtitle">API de modération d'image ultra-rapide</p>
+    </header>
+
+    <div class="upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <span class="upload-icon">☁️</span>
+        <p><strong>Cliquez pour uploader</strong> ou glissez une image</p>
+        <p style="font-size: 12px; color: #94a3b8; mt: 5px;">PNG, JPG ou WebP supportés</p>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*">
+
+    <div class="preview-container" id="previewContainer">
+        <img id="previewImage" class="preview-image">
+    </div>
+
+    <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <p style="font-size: 13px; color: #64748b; margin-top: 8px;">Analyse par l'IA...</p>
+    </div>
+
+    <div id="statusBadge" class="status-badge"></div>
+
+    <footer>
+        Powered by CLIP & FastAPI • <span id="apiStatus">Online</span>
+    </footer>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImage = document.getElementById('previewImage');
+    const loader = document.getElementById('loader');
+    const statusBadge = document.getElementById('statusBadge');
+
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // 1. Afficher l'aperçu immédiatement
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            previewImage.src = event.target.result;
+            previewImage.style.filter = 'none'; // Reset flou
+            previewContainer.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+
+        // 2. UI Reset
+        statusBadge.style.display = 'none';
+        loader.style.display = 'block';
+
+        // 3. Appel API
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            // NOTE: En production, remplace '/predict' par ton URL Render complète
+            const response = await fetch('/predict', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            loader.style.display = 'none';
+            statusBadge.style.display = 'block';
+
+            if (data.is_nsfw) {
+                statusBadge.className = 'status-badge status-blocked';
+                statusBadge.innerText = '❌ Image Bloquée : Contenu Inapproprié';
+                previewImage.style.filter = 'blur(40px)'; // Sécurité visuelle
+            } else {
+                statusBadge.className = 'status-badge status-allowed';
+                statusBadge.innerText = '✅ Image Autorisée';
+                previewImage.style.filter = 'none';
+            }
+
+        } catch (error) {
+            loader.style.display = 'none';
+            alert("Erreur de connexion à l'API de modération.");
+        }
+    });
+</script>
+
+</body>
+</html>
