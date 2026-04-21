@@ -19,7 +19,7 @@ app.add_middleware(
 # Charger CLIP
 print("🔄 Chargement du modèle CLIP...")
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = clip.load("ViT-B/32", device=device)
+model, preprocess = clip.load("RN50", device=device)
 print(f"✅ Modèle chargé sur {device}")
 
 # Catégories pour l'analyse
